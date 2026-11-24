@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui/controls'
 import { staff, todayInJst, type Slot, type Worker } from '../../domain/model'
 import { createCaseStore, type StoredCase } from '../../domain/storage'
-import { applyReport, assignCase, confirmReport, workerCases } from '../../domain/workflow'
+import { AssignmentConflictError, applyReport, assignCase, confirmReport, workerCases } from '../../domain/workflow'
 import { AdminCases } from './AdminCases'
 import { AdminReports } from './AdminReports'
 import { ReportForm } from './ReportForm'
@@ -91,7 +91,8 @@ export function PrototypeApp() {
       setNotice(message)
       setNow(Date.now())
     } catch (failure) {
-      throw failure instanceof Error && !(failure instanceof DOMException) ? failure : new Error(storageError(failure))
+      if (failure instanceof AssignmentConflictError) throw failure
+      throw new Error(storageError(failure))
     } finally {
       writeInProgress.current = false
       setBusy(false)

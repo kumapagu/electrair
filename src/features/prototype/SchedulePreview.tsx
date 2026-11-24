@@ -16,6 +16,7 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
   item: StoredCase; date: string; onClose: () => void; onSave: (slot: Slot, address?: string) => Promise<void>
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  const focusField = useRef<string | undefined>(undefined)
   const [slot, setSlot] = useState<Slot>(item.slot ?? { date, start: '09:00', end: '11:00', worker: staff[0] })
   const [error, setError] = useState('')
   const [issues, setIssues] = useState<ReturnType<typeof assignmentErrors>>({})
@@ -25,6 +26,12 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
   const submitted = workStatus(item) === '完了'
   const needsAddress = !item.address.trim() && !submitted
   useEffect(() => { dialog.current?.showModal() }, [])
+  useEffect(() => {
+    if (saving || !focusField.current) return
+    const field = dialog.current?.querySelector('form')?.elements.namedItem(focusField.current)
+    focusField.current = undefined
+    if (field instanceof HTMLElement) field.focus()
+  }, [saving, issues, conflict])
 
   function close() {
     dialog.current?.close()
@@ -57,18 +64,13 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (saving || submitted) return
-    const form = event.currentTarget
-    const focusField = (name: string) => requestAnimationFrame(() => {
-      const field = form.elements.namedItem(name)
-      if (field instanceof HTMLElement) field.focus()
-    })
     setError('')
     setConflict('')
     const nextIssues = assignmentErrors(needsAddress ? address : item.address, slot)
     setIssues(nextIssues)
     const [firstIssue] = Object.keys(nextIssues)
     if (firstIssue) {
-      focusField(firstIssue)
+      focusField.current = firstIssue
       return
     }
 
@@ -78,8 +80,8 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
       close()
     } catch (failure) {
       if (failure instanceof AssignmentConflictError) {
+        focusField.current = 'start'
         setConflict(failure.message)
-        focusField('start')
       } else {
         setError(failure instanceof Error ? failure.message : '割当の保存に失敗しました。もう一度お試しください。')
       }

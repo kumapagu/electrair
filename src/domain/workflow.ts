@@ -10,23 +10,33 @@ export function registrationErrors(input: Registration) {
   return errors
 }
 
-export function assignCase(cases: Case[], item: Case, slot: Slot, supplement?: string): Case {
-  if (item.report?.submittedAt !== undefined) throw new Error('提出済みの案件は日程・担当を変更できません。')
-  const address = item.address.trim() ? item.address : supplement?.trim()
-  if (!address) throw new Error('予定を確定するには現場住所が必要です。')
+export function assignmentErrors(address: string, slot: Slot) {
+  const errors: Partial<Record<'address' | keyof Slot, string>> = {}
+  if (!address.trim()) errors.address = '予定を確定するには現場住所が必要です。'
   const day = new Date(`${slot.date}T00:00:00Z`)
   if (!datePattern.test(slot.date) || Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== slot.date) {
-    throw new Error('工事日を入力してください。')
+    errors.date = '工事日を入力してください。'
   }
-  if (!timePattern.test(slot.start) || !timePattern.test(slot.end)) throw new Error('開始時刻と終了時刻を入力してください。')
-  if (slot.end <= slot.start) throw new Error('終了時刻は開始時刻より後にしてください。')
-  if (!staff.includes(slot.worker)) throw new Error('担当作業員を選択してください。')
+  if (!timePattern.test(slot.start)) errors.start = '開始時刻を入力してください。'
+  if (!timePattern.test(slot.end)) errors.end = '終了時刻を入力してください。'
+  else if (!errors.start && slot.end <= slot.start) errors.end = '終了時刻は開始時刻より後にしてください。'
+  if (!staff.includes(slot.worker)) errors.worker = '担当作業員を選択してください。'
+  return errors
+}
+
+export class AssignmentConflictError extends Error {}
+
+export function assignCase(cases: Case[], item: Case, slot: Slot, supplement?: string): Case {
+  if (item.report?.submittedAt !== undefined) throw new Error('提出済みの案件は日程・担当を変更できません。')
+  const address = item.address.trim() ? item.address : supplement?.trim() ?? ''
+  const [error] = Object.values(assignmentErrors(address, slot))
+  if (error) throw new Error(error)
 
   for (const other of cases) {
     const existing = other.slot
     if (item.id !== other.id && existing?.date === slot.date && existing.worker === slot.worker
       && slot.start < existing.end && existing.start < slot.end) {
-      throw new Error(`${slot.worker}さんの「${other.site}」（${existing.start}–${existing.end}）と重複しています。`)
+      throw new AssignmentConflictError(`${slot.worker}さんの「${other.site}」（${existing.start}–${existing.end}）と重複しています。`)
     }
   }
   return { ...item, address, slot }

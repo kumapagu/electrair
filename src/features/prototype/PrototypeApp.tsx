@@ -91,7 +91,7 @@ export function PrototypeApp() {
       setNotice(message)
       setNow(Date.now())
     } catch (failure) {
-      throw new Error(storageError(failure))
+      throw failure instanceof Error && !(failure instanceof DOMException) ? failure : new Error(storageError(failure))
     } finally {
       writeInProgress.current = false
       setBusy(false)

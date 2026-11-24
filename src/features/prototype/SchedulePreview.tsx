@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Badge, Button, Field, Select } from '../../components/ui/controls'
 import { addDays, formatDay, shortDay, staff, weekday, type Slot, type Worker } from '../../domain/model'
 import type { StoredCase } from '../../domain/storage'
-import { workStatus } from '../../domain/workflow'
+import { AssignmentConflictError, assignmentErrors, workStatus } from '../../domain/workflow'
 import { CaseStatuses } from './CaseDetails'
 import { UnassignedCaseCard } from './UnassignedCaseCard'
 
@@ -18,12 +18,12 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
   const dialog = useRef<HTMLDialogElement>(null)
   const [slot, setSlot] = useState<Slot>(item.slot ?? { date, start: '09:00', end: '11:00', worker: staff[0] })
   const [error, setError] = useState('')
+  const [issues, setIssues] = useState<ReturnType<typeof assignmentErrors>>({})
+  const [conflict, setConflict] = useState('')
   const [saving, setSaving] = useState(false)
   const [address, setAddress] = useState('')
   const submitted = workStatus(item) === '完了'
   const needsAddress = !item.address.trim() && !submitted
-  const addressError = error.startsWith('予定を確定するには現場住所')
-  const timeError = error.startsWith('終了時刻') || error.startsWith('開始時刻')
   useEffect(() => { dialog.current?.showModal() }, [])
 
   function close() {
@@ -33,19 +33,56 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
 
   function update<K extends keyof Slot>(key: K, value: Slot[K]) {
     setSlot({ ...slot, [key]: value })
+    setIssues(current => key === 'start' && slot.end
+      ? { ...current, start: undefined, end: undefined }
+      : { ...current, [key]: undefined })
+    setConflict('')
     setError('')
+  }
+
+  function fieldAttributes(field: 'address' | keyof Slot) {
+    const conflictField = conflict && (field === 'start' || field === 'end')
+    return {
+      name: field,
+      required: true,
+      'aria-invalid': Boolean(issues[field] || conflictField) || undefined,
+      'aria-describedby': issues[field] ? `slot-${field}-error` : conflictField ? 'slot-conflict' : undefined,
+    }
+  }
+
+  function fieldError(field: 'address' | keyof Slot) {
+    return issues[field] && <p id={`slot-${field}-error`} role="alert" className="error mt-1">{issues[field]}</p>
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (saving || submitted) return
-    setSaving(true)
+    const form = event.currentTarget
+    const focusField = (name: string) => requestAnimationFrame(() => {
+      const field = form.elements.namedItem(name)
+      if (field instanceof HTMLElement) field.focus()
+    })
     setError('')
+    setConflict('')
+    const nextIssues = assignmentErrors(needsAddress ? address : item.address, slot)
+    setIssues(nextIssues)
+    const [firstIssue] = Object.keys(nextIssues)
+    if (firstIssue) {
+      focusField(firstIssue)
+      return
+    }
+
+    setSaving(true)
     try {
       await onSave(slot, needsAddress ? address : undefined)
       close()
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : '割当の保存に失敗しました。もう一度お試しください。')
+      if (failure instanceof AssignmentConflictError) {
+        setConflict(failure.message)
+        focusField('start')
+      } else {
+        setError(failure instanceof Error ? failure.message : '割当の保存に失敗しました。もう一度お試しください。')
+      }
     } finally {
       setSaving(false)
     }
@@ -53,7 +90,7 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
 
   return (
     <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!saving) close() }} aria-labelledby="slot-title" className="preview-dialog">
-      <form onSubmit={submit}>
+      <form noValidate onSubmit={submit}>
         <div className="dialog-heading">
           <div><p className="meta">{item.id} · {item.client}</p><h2 id="slot-title">{item.site}</h2></div>
           <Button variant="ghost" aria-label="閉じる" onClick={close} disabled={saving} className="px-3"><X size={20} aria-hidden="true" /></Button>
@@ -66,25 +103,36 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
           {submitted && <p className="notice">報告を提出済みです。日程・担当は閲覧できます。</p>}
           {item.report && !submitted && <p className="notice">保存済みの下書きがあります。担当を変更すると新しい担当者に引き継がれます。</p>}
           <fieldset className="grid min-w-0 gap-3" disabled={submitted || saving}>
-            {needsAddress && <>
-              <Field label="現場住所（必須）"><input required value={address} aria-invalid={addressError || undefined}
-                aria-describedby={addressError ? 'slot-address-error' : undefined}
-                onChange={event => { setAddress(event.target.value); setError('') }} /></Field>
-              {addressError && <p id="slot-address-error" role="alert" className="error">{error}</p>}
-            </>}
-            <Field label="工事日"><input type="date" required value={slot.date} onChange={event => update('date', event.target.value)} /></Field>
-            <div className="grid min-w-0 grid-cols-2 gap-3">
-              <Field label="開始時刻"><input type="time" required aria-describedby={timeError ? 'slot-time-error' : undefined} value={slot.start} onChange={event => update('start', event.target.value)} /></Field>
-              <Field label="終了時刻"><input type="time" required aria-invalid={timeError || undefined} aria-describedby={timeError ? 'slot-time-error' : undefined} value={slot.end} onChange={event => update('end', event.target.value)} /></Field>
+            {needsAddress && <div>
+              <Field label="現場住所（必須）"><input {...fieldAttributes('address')} value={address}
+                onChange={event => { setAddress(event.target.value); setIssues(current => ({ ...current, address: undefined })); setError('') }} /></Field>
+              {fieldError('address')}
+            </div>}
+            <div>
+              <Field label="工事日"><input {...fieldAttributes('date')} type="date" value={slot.date} onChange={event => update('date', event.target.value)} /></Field>
+              {fieldError('date')}
             </div>
-            {timeError && <p id="slot-time-error" role="alert" className="error">{error}</p>}
-            <Field label="担当作業員">
-              <Select value={slot.worker} onChange={event => update('worker', event.target.value as Worker)}>
-                {staff.map(worker => <option key={worker}>{worker}</option>)}
-              </Select>
-            </Field>
+            <div className="grid min-w-0 grid-cols-2 gap-3">
+              <div className="min-w-0">
+                <Field label="開始時刻"><input {...fieldAttributes('start')} type="time" value={slot.start} onChange={event => update('start', event.target.value)} /></Field>
+                {fieldError('start')}
+              </div>
+              <div className="min-w-0">
+                <Field label="終了時刻"><input {...fieldAttributes('end')} type="time" value={slot.end} onChange={event => update('end', event.target.value)} /></Field>
+                {fieldError('end')}
+              </div>
+              {conflict && <p id="slot-conflict" role="alert" className="error col-span-2">{conflict}</p>}
+            </div>
+            <div>
+              <Field label="担当作業員">
+                <Select {...fieldAttributes('worker')} value={slot.worker} onChange={event => update('worker', event.target.value as Worker)}>
+                  {staff.map(worker => <option key={worker}>{worker}</option>)}
+                </Select>
+              </Field>
+              {fieldError('worker')}
+            </div>
           </fieldset>
-          {error && !timeError && !addressError && <p role="alert" className="error">{error}</p>}
+          {error && <p role="alert" className="error">{error}</p>}
         </div>
         {!submitted && <div className="mt-5 flex justify-end gap-2">
           <Button variant="outline" onClick={close} disabled={saving}>キャンセル</Button><Button type="submit" disabled={saving}>{saving ? '保存中' : item.slot ? '変更を保存' : '割当を保存'}</Button>

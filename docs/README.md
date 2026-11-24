@@ -10,7 +10,7 @@
 | --- | --- |
 | [開発フロー](development-workflow.md) | 工程、確認、判断権限、完了条件 |
 | [引継ぎ資料](prototype-handoff.md) | 目的、H01〜H03、対象範囲、技術構成、利用者検証 |
-| [仕様一覧](specs/README.md) | 振る舞いとP01〜P14 |
+| [仕様一覧](specs/README.md) | 振る舞いとP01〜P16 |
 | [初回プロトタイプ設計 v0.1](specs/prototype-design.md) | ②で承認したルール、導線、データ、代表画面、検証分担 |
 | [デザイン方針](design-guidelines.md) | 用語、表示・操作、共通部品、Storybook |
 | [作業一覧](tasks/README.md) | 進行状況と各作業の承認・検証・引継ぎ |

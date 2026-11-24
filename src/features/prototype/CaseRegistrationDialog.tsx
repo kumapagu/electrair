@@ -13,6 +13,11 @@ export function CaseRegistrationDialog({ onClose, onSave }: {
   const [saveError, setSaveError] = useState('')
   useEffect(() => { dialog.current?.showModal() }, [])
 
+  function close() {
+    dialog.current?.close()
+    onClose()
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (pending.current) return
@@ -33,6 +38,7 @@ export function CaseRegistrationDialog({ onClose, onSave }: {
     setSaving(true)
     try {
       await onSave(input)
+      close()
     } catch (failure) {
       setSaveError(failure instanceof Error ? failure.message : '案件を保存できませんでした。')
     } finally {
@@ -42,7 +48,7 @@ export function CaseRegistrationDialog({ onClose, onSave }: {
   }
 
   return <dialog ref={dialog} className="preview-dialog" aria-labelledby="registration-title"
-    onCancel={event => { if (pending.current) event.preventDefault(); else onClose() }}>
+    onCancel={event => { event.preventDefault(); if (!pending.current) close() }}>
     <div className="dialog-heading"><h2 id="registration-title">新規案件を登録</h2></div>
     <form noValidate onSubmit={submit}>
       <fieldset disabled={saving} className="grid min-w-0 gap-3">
@@ -59,7 +65,7 @@ export function CaseRegistrationDialog({ onClose, onSave }: {
       </fieldset>
       {saveError && <p role="alert" className="error mt-3">{saveError}</p>}
       <div className="mt-5 flex flex-wrap justify-end gap-2">
-        <Button variant="outline" disabled={saving} onClick={onClose}>キャンセル</Button>
+        <Button variant="outline" disabled={saving} onClick={close}>キャンセル</Button>
         <Button type="submit" disabled={saving}>{saving ? '登録中' : '案件を登録'}</Button>
       </div>
     </form>

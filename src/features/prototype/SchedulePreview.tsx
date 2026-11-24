@@ -26,6 +26,11 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
   const timeError = error.startsWith('終了時刻') || error.startsWith('開始時刻')
   useEffect(() => { dialog.current?.showModal() }, [])
 
+  function close() {
+    dialog.current?.close()
+    onClose()
+  }
+
   function update<K extends keyof Slot>(key: K, value: Slot[K]) {
     setSlot({ ...slot, [key]: value })
     setError('')
@@ -38,6 +43,7 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
     setError('')
     try {
       await onSave(slot, needsAddress ? address : undefined)
+      close()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : '割当の保存に失敗しました。もう一度お試しください。')
     } finally {
@@ -46,11 +52,11 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
   }
 
   return (
-    <dialog ref={dialog} onCancel={event => { if (saving) event.preventDefault(); else onClose() }} aria-labelledby="slot-title" className="preview-dialog">
+    <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!saving) close() }} aria-labelledby="slot-title" className="preview-dialog">
       <form onSubmit={submit}>
         <div className="dialog-heading">
           <div><p className="meta">{item.id} · {item.client}</p><h2 id="slot-title">{item.site}</h2></div>
-          <Button variant="ghost" aria-label="閉じる" onClick={onClose} disabled={saving} className="px-3"><X size={20} aria-hidden="true" /></Button>
+          <Button variant="ghost" aria-label="閉じる" onClick={close} disabled={saving} className="px-3"><X size={20} aria-hidden="true" /></Button>
         </div>
         {!needsAddress && <p className="meta flex items-start gap-2"><MapPin size={16} aria-hidden="true" />{item.address || '住所未入力'}</p>}
         <p className="mt-2 text-sm">エアコン入替 · {item.equipment}</p>
@@ -81,7 +87,7 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
           {error && !timeError && !addressError && <p role="alert" className="error">{error}</p>}
         </div>
         {!submitted && <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>キャンセル</Button><Button type="submit" disabled={saving}>{saving ? '保存中' : item.slot ? '変更を保存' : '割当を保存'}</Button>
+          <Button variant="outline" onClick={close} disabled={saving}>キャンセル</Button><Button type="submit" disabled={saving}>{saving ? '保存中' : item.slot ? '変更を保存' : '割当を保存'}</Button>
         </div>}
       </form>
     </dialog>
@@ -143,7 +149,6 @@ export function Schedule({ cases, today, onSave }: { cases: StoredCase[]; today:
       {editing && <ScheduleDialog item={editing} date={date} onClose={() => setEditing(undefined)} onSave={async (slot, address) => {
         await onSave(editing, slot, address)
         setDate(slot.date)
-        setEditing(undefined)
       }} />}
     </>
   )

@@ -99,7 +99,7 @@ export function PrototypeApp() {
   }
 
   function saveAssignment(item: StoredCase, slot: Slot, address?: string) {
-    return write(() => database.update(item, (current, all) => assignCase(all, current, slot, address)), `「${item.site}」の割当を保存しました。`)
+    return write(() => database.update(item, (current, all) => assignCase(all, current, slot, address)), '割当を保存しました。')
   }
 
   function leaveJob() {
@@ -158,7 +158,7 @@ export function PrototypeApp() {
           </div> : <p role="status" className="panel">案件を読み込んでいます。</p>) : role === 'admin' ? (
             adminPage === 'cases'
               ? <AdminCases key={workspaceKey} cases={cases} today={today} busy={busy} onAssign={saveAssignment}
-                onRegister={input => write(() => database.registerCase(input), `「${input.site.trim()}」を登録しました。`)} />
+                onRegister={input => write(() => database.registerCase(input), '案件を登録しました。')} />
               : adminPage === 'schedule'
                 ? <Schedule key={workspaceKey} cases={cases} today={today} onSave={saveAssignment} />
                 : <AdminReports key={workspaceKey} cases={cases} now={now} busy={busy} onConfirm={item => write(() => database.update(item, current => confirmReport(current, Date.now())), '報告を確認済みにしました。')} />

@@ -132,6 +132,24 @@ Chromium 156で幅390px・1440pxの両方を確認した。必須入力の不足
 | 型・テスト・ビルド | Node.js 24.22.1、pnpm 11.25.0。`pnpm typecheck`、`pnpm test`、`pnpm build`、`STORYBOOK_DISABLE_TELEMETRY=1 pnpm build-storybook` | 合格。テスト14件合格。Storybookビルドはグローバル設定保存とチャンクサイズの警告あり |
 | Storybookの画面 | ビルドしたStorybookをChromiumの390px幅で開き、共通操作、未割当案件カード、写真追加欄の3状態を表示 | 合格。5件の表示を確認 |
 
+### 保存失敗の再現
+
+確認専用の新しいブラウザプロファイルでアプリを起動し、「案件一覧」が表示された後に開発者ツールのコンソールで実行する。現場名を「保存中断テスト」にして登録すると、挿入が成功した直後にトランザクションを中断する。フォームと入力が残り、成功表示が出ないことを確認する。`restoreRegistrationTest()` を実行してフォームを再送し、1件だけ追加されることを確認する。自動テストでは `node --test --test-name-pattern='rejected registration' tests/case-registration.test.mjs` で、中断後のDB内容と再試行を確認できる。
+
+```js
+(() => {
+  const original = IDBObjectStore.prototype.add;
+  IDBObjectStore.prototype.add = function (...args) {
+    const request = original.apply(this, args);
+    if (args[0].site === '保存中断テスト') {
+      request.addEventListener('success', () => this.transaction.abort(), { once: true });
+    }
+    return request;
+  };
+  window.restoreRegistrationTest = () => { IDBObjectStore.prototype.add = original; };
+})();
+```
+
 ## 引継ぎ
 
 案件登録から管理者の報告確認まで実装後の確認を終えた。⑥の独立レビュー後、対象版と操作手順を⑧へ引き継ぐ。iPhone Safari実機と利用者検証はT004で行う。

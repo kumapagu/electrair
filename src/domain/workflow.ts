@@ -1,11 +1,19 @@
-import { photoCategories, staff, type Case, type Draft, type ReportGroup, type Slot, type Worker } from './model.ts'
+import { photoCategories, staff, type Case, type Draft, type Registration, type ReportGroup, type Slot, type Worker } from './model.ts'
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/
 
-export function assignCase(cases: Case[], item: Case, slot: Slot): Case {
+export function registrationErrors(input: Registration) {
+  const errors: Partial<Record<'client' | 'site', string>> = {}
+  if (!input.client.trim()) errors.client = '元請けを入力してください。'
+  if (!input.site.trim()) errors.site = '現場名を入力してください。'
+  return errors
+}
+
+export function assignCase(cases: Case[], item: Case, slot: Slot, supplement?: string): Case {
   if (item.report?.submittedAt !== undefined) throw new Error('提出済みの案件は日程・担当を変更できません。')
-  if (!item.address.trim()) throw new Error('予定を確定するには現場住所が必要です。')
+  const address = item.address.trim() ? item.address : supplement?.trim()
+  if (!address) throw new Error('予定を確定するには現場住所が必要です。')
   const day = new Date(`${slot.date}T00:00:00Z`)
   if (!datePattern.test(slot.date) || Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== slot.date) {
     throw new Error('工事日を入力してください。')
@@ -21,7 +29,7 @@ export function assignCase(cases: Case[], item: Case, slot: Slot): Case {
       throw new Error(`${slot.worker}さんの「${other.site}」（${existing.start}–${existing.end}）と重複しています。`)
     }
   }
-  return { ...item, slot }
+  return { ...item, address, slot }
 }
 
 export function workerCases(cases: Case[], worker: Worker, day: string): Case[] {

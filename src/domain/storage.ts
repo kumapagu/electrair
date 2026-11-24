@@ -1,5 +1,6 @@
-import { revisionId, type Case } from './model.ts'
+import { revisionId, type Case, type Registration } from './model.ts'
 import { createSampleCases } from './sample.ts'
+import { registrationErrors } from './workflow.ts'
 
 export type StoredCase = Case & { revision: string }
 const collection = 'cases'
@@ -57,6 +58,25 @@ export function createCaseStore(factory: IDBFactory, name = 'electrair', seed = 
 
   return {
     load: () => transact((store, cases) => cases.length ? cases : addSampleCases(store)),
+    registerCase: (input: Registration) => transact((store, cases) => {
+      const errors = registrationErrors(input)
+      if (errors.client || errors.site) throw new Error(Object.values(errors).join(' '))
+      const records = cases.length ? cases : addSampleCases(store)
+      const latest = records.reduce((max, item) => Math.max(max, item.createdAt ?? 0), 0)
+      const item: StoredCase = {
+        id: `EL-${revisionId()}`,
+        revision: revisionId(),
+        createdAt: Math.max(Date.now(), latest + 1),
+        client: input.client.trim(),
+        site: input.site.trim(),
+        address: input.address.trim(),
+        note: input.note.trim(),
+        area: '',
+        equipment: '1台',
+      }
+      store.add(item)
+      return [...records, item]
+    }),
     reset: () => transact(store => {
       store.clear()
       return addSampleCases(store)

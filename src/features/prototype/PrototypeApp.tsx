@@ -1,9 +1,10 @@
-import { CalendarDays, Check, ClipboardList, RotateCcw, Wind } from 'lucide-react'
+import { CalendarDays, Check, ClipboardList, FolderOpen, RotateCcw, Wind } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui/controls'
-import { staff, todayInJst, type Worker } from '../../domain/model'
+import { staff, todayInJst, type Slot, type Worker } from '../../domain/model'
 import { createCaseStore, type StoredCase } from '../../domain/storage'
 import { applyReport, assignCase, confirmReport, workerCases } from '../../domain/workflow'
+import { AdminCases } from './AdminCases'
 import { AdminReports } from './AdminReports'
 import { ReportForm } from './ReportForm'
 import { Schedule } from './SchedulePreview'
@@ -22,7 +23,7 @@ function ResetDialog({ busy, error, onClose, onReset }: { busy: boolean; error: 
   useEffect(() => { dialog.current?.showModal() }, [])
   return <dialog ref={dialog} className="preview-dialog" aria-labelledby="reset-title" onCancel={event => { if (busy) event.preventDefault(); else onClose() }}>
     <div className="dialog-heading"><h2 id="reset-title">初期サンプルに戻しますか？</h2></div>
-    <p className="text-sm">このブラウザに保存された割当の変更、報告、下書き、追加写真を消去し、架空のサンプルを作り直します。</p>
+    <p className="text-sm">このブラウザに保存された追加案件、割当の変更、報告、下書き、追加写真を消去し、架空のサンプルを作り直します。</p>
     {error && <p role="alert" className="error mt-3">{error}</p>}
     <div className="mt-5 flex flex-wrap justify-end gap-2">
       <Button variant="outline" disabled={busy} onClick={onClose}>キャンセル</Button><Button disabled={busy} onClick={onReset}>{busy ? '初期化中' : '初期サンプルに戻す'}</Button>
@@ -35,7 +36,7 @@ export function PrototypeApp() {
   const [loadError, setLoadError] = useState('')
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [role, setRole] = useState<'admin' | 'worker'>('admin')
-  const [adminPage, setAdminPage] = useState<'schedule' | 'reports'>('schedule')
+  const [adminPage, setAdminPage] = useState<'schedule' | 'cases' | 'reports'>('schedule')
   const [worker, setWorker] = useState<Worker>(staff[0])
   const [jobId, setJobId] = useState<string>()
   const [dirty, setDirty] = useState(false)
@@ -97,6 +98,10 @@ export function PrototypeApp() {
     }
   }
 
+  function saveAssignment(item: StoredCase, slot: Slot, address?: string) {
+    return write(() => database.update(item, (current, all) => assignCase(all, current, slot, address)), `「${item.site}」の割当を保存しました。`)
+  }
+
   function leaveJob() {
     if (reading || writeInProgress.current || (dirty && !window.confirm('未保存の変更があります。保存せずに移動しますか？'))) return false
     setDirty(false)
@@ -133,9 +138,10 @@ export function PrototypeApp() {
         </div>
       </header>
       <aside className="sidebar">
-        <nav aria-label="メニュー" className="preview-nav">
+        <nav aria-label="メニュー" className="preview-nav" data-view={role}>
           {role === 'admin' ? <>
             <button type="button" aria-current={adminPage === 'schedule' ? 'page' : undefined} disabled={busy} onClick={() => setAdminPage('schedule')}><CalendarDays size={20} aria-hidden="true" />予定・割当</button>
+            <button type="button" aria-current={adminPage === 'cases' ? 'page' : undefined} disabled={busy} onClick={() => setAdminPage('cases')}><FolderOpen size={20} aria-hidden="true" />案件一覧</button>
             <button type="button" aria-current={adminPage === 'reports' ? 'page' : undefined} disabled={busy} onClick={() => setAdminPage('reports')}><ClipboardList size={20} aria-hidden="true" />報告確認</button>
           </> : <button type="button" aria-current={!job ? 'page' : undefined} disabled={busy || reading} onClick={leaveJob}><ClipboardList size={20} aria-hidden="true" />今日の案件</button>}
         </nav>
@@ -150,9 +156,12 @@ export function PrototypeApp() {
             <p role="alert" className="error">案件データを読み込めませんでした。{loadError}</p>
             <Button className="justify-self-start" onClick={() => { setLoadError(''); setLoadAttempt(value => value + 1) }}>再試行</Button>
           </div> : <p role="status" className="panel">案件を読み込んでいます。</p>) : role === 'admin' ? (
-            adminPage === 'schedule'
-              ? <Schedule key={workspaceKey} cases={cases} today={today} onSave={(item, slot) => write(() => database.update(item, (current, all) => assignCase(all, current, slot)), `「${item.site}」の割当を保存しました。`)} />
-              : <AdminReports key={workspaceKey} cases={cases} now={now} busy={busy} onConfirm={item => write(() => database.update(item, current => confirmReport(current, Date.now())), '報告を確認済みにしました。')} />
+            adminPage === 'cases'
+              ? <AdminCases key={workspaceKey} cases={cases} today={today} busy={busy} onAssign={saveAssignment}
+                onRegister={input => write(() => database.registerCase(input), `「${input.site.trim()}」を登録しました。`)} />
+              : adminPage === 'schedule'
+                ? <Schedule key={workspaceKey} cases={cases} today={today} onSave={saveAssignment} />
+                : <AdminReports key={workspaceKey} cases={cases} now={now} busy={busy} onConfirm={item => write(() => database.update(item, current => confirmReport(current, Date.now())), '報告を確認済みにしました。')} />
           ) : job ? <ReportForm key={job.id} item={job} busy={busy} reading={reading} onReading={setReading} onDirty={setDirty} onBack={leaveJob}
             onSave={async (draft, submit) => {
               await write(() => database.update(job, current => applyReport(current, worker, draft, submit ? Date.now() : undefined)),

@@ -12,14 +12,17 @@ function firstDayOfWeek(date: string) {
   return addDays(date, -((weekday + 6) % 7))
 }
 
-function ScheduleDialog({ item, date, onClose, onSave }: {
-  item: StoredCase; date: string; onClose: () => void; onSave: (slot: Slot) => Promise<void>
+export function ScheduleDialog({ item, date, onClose, onSave }: {
+  item: StoredCase; date: string; onClose: () => void; onSave: (slot: Slot, address?: string) => Promise<void>
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [slot, setSlot] = useState<Slot>(item.slot ?? { date, start: '09:00', end: '11:00', worker: staff[0] })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [address, setAddress] = useState('')
   const submitted = workStatus(item) === '完了'
+  const needsAddress = !item.address.trim() && !submitted
+  const addressError = error.startsWith('予定を確定するには現場住所')
   const timeError = error.startsWith('終了時刻') || error.startsWith('開始時刻')
   useEffect(() => { dialog.current?.showModal() }, [])
 
@@ -34,7 +37,7 @@ function ScheduleDialog({ item, date, onClose, onSave }: {
     setSaving(true)
     setError('')
     try {
-      await onSave(slot)
+      await onSave(slot, needsAddress ? address : undefined)
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : '割当の保存に失敗しました。もう一度お試しください。')
     } finally {
@@ -49,7 +52,7 @@ function ScheduleDialog({ item, date, onClose, onSave }: {
           <div><p className="meta">{item.id} · {item.client}</p><h2 id="slot-title">{item.site}</h2></div>
           <Button variant="ghost" aria-label="閉じる" onClick={onClose} disabled={saving} className="px-3"><X size={20} aria-hidden="true" /></Button>
         </div>
-        <p className="meta flex items-start gap-2"><MapPin size={16} aria-hidden="true" />{item.address}</p>
+        {!needsAddress && <p className="meta flex items-start gap-2"><MapPin size={16} aria-hidden="true" />{item.address || '住所未入力'}</p>}
         <p className="mt-2 text-sm">エアコン入替 · {item.equipment}</p>
         <p className="mt-1 mb-3 text-sm">{item.note}</p>
         <div className="mb-4"><CaseStatuses item={item} /></div>
@@ -57,6 +60,12 @@ function ScheduleDialog({ item, date, onClose, onSave }: {
           {submitted && <p className="notice">報告を提出済みです。日程・担当は閲覧できます。</p>}
           {item.report && !submitted && <p className="notice">保存済みの下書きがあります。担当を変更すると新しい担当者に引き継がれます。</p>}
           <fieldset className="grid min-w-0 gap-3" disabled={submitted || saving}>
+            {needsAddress && <>
+              <Field label="現場住所（必須）"><input required value={address} aria-invalid={addressError || undefined}
+                aria-describedby={addressError ? 'slot-address-error' : undefined}
+                onChange={event => { setAddress(event.target.value); setError('') }} /></Field>
+              {addressError && <p id="slot-address-error" role="alert" className="error">{error}</p>}
+            </>}
             <Field label="工事日"><input type="date" required value={slot.date} onChange={event => update('date', event.target.value)} /></Field>
             <div className="grid min-w-0 grid-cols-2 gap-3">
               <Field label="開始時刻"><input type="time" required aria-describedby={timeError ? 'slot-time-error' : undefined} value={slot.start} onChange={event => update('start', event.target.value)} /></Field>
@@ -69,7 +78,7 @@ function ScheduleDialog({ item, date, onClose, onSave }: {
               </Select>
             </Field>
           </fieldset>
-          {error && !timeError && <p role="alert" className="error">{error}</p>}
+          {error && !timeError && !addressError && <p role="alert" className="error">{error}</p>}
         </div>
         {!submitted && <div className="mt-5 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={saving}>キャンセル</Button><Button type="submit" disabled={saving}>{saving ? '保存中' : item.slot ? '変更を保存' : '割当を保存'}</Button>
@@ -79,7 +88,7 @@ function ScheduleDialog({ item, date, onClose, onSave }: {
   )
 }
 
-export function Schedule({ cases, today, onSave }: { cases: StoredCase[]; today: string; onSave: (item: StoredCase, slot: Slot) => Promise<void> }) {
+export function Schedule({ cases, today, onSave }: { cases: StoredCase[]; today: string; onSave: (item: StoredCase, slot: Slot, address?: string) => Promise<void> }) {
   const [date, setDate] = useState(today)
   const [editing, setEditing] = useState<StoredCase>()
   const week = Array.from({ length: 7 }, (_, index) => addDays(firstDayOfWeek(date), index))
@@ -122,7 +131,7 @@ export function Schedule({ cases, today, onSave }: { cases: StoredCase[]; today:
                 {assigned.map(item => <div key={item.id} className="slot-card">
                   <div className="slot-time"><Clock3 size={15} aria-hidden="true" />{item.slot!.start}–{item.slot!.end}</div>
                   <div className="font-bold">{item.site}</div>
-                  <div className="slot-actions"><span className="meta">{item.area}</span>
+                  <div className="slot-actions"><span className="meta">{item.area || item.address}</span>
                     <Button variant="ghost" className="px-2" onClick={() => setEditing(item)}>{workStatus(item) === '完了' ? '詳細を見る' : '日程・担当を変更'}</Button></div>
                 </div>)}
               </section>
@@ -131,8 +140,8 @@ export function Schedule({ cases, today, onSave }: { cases: StoredCase[]; today:
           <p className="schedule-note">重複確認は工事時間のみ。移動・休憩・休日・出勤可否は別途確認してください。</p>
         </section>
       </div>
-      {editing && <ScheduleDialog item={editing} date={date} onClose={() => setEditing(undefined)} onSave={async slot => {
-        await onSave(editing, slot)
+      {editing && <ScheduleDialog item={editing} date={date} onClose={() => setEditing(undefined)} onSave={async (slot, address) => {
+        await onSave(editing, slot, address)
         setDate(slot.date)
         setEditing(undefined)
       }} />}

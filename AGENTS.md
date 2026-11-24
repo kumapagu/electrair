@@ -4,10 +4,11 @@
 
 ## 作業開始時
 
-1. [資料一覧](docs/README.md)、[開発フロー](docs/development-workflow.md)、[作業一覧](docs/tasks/README.md)を読む。
-2. [引継ぎ資料](docs/prototype-handoff.md)で目的・今回の範囲を確認する。
-3. 対象作業記録、必要な[仕様](docs/specs/README.md)、採用済み[ADR](docs/adr/README.md)と関連コードだけを読む。UI変更では[デザイン方針](docs/design-guidelines.md)も読む。
-4. [資料一覧](docs/README.md#aiの工程別手順)の対応表から`.agents/skills/`の工程に合う手順を読む。すべての手順・過去ログを毎回読み込まない。
+1. チェックアウト中のブランチとコミット、未コミット変更を確認する。作業の起点として指定されたブランチがあれば、対象コミットを確認してから、その版の実装と作業一覧を読む。クラウド環境では `work` などのブランチ名だけで最新状態を判断しない。
+2. [資料一覧](docs/README.md)、[開発フロー](docs/development-workflow.md)、[作業一覧](docs/tasks/README.md)を読む。
+3. [引継ぎ資料](docs/prototype-handoff.md)で目的・今回の範囲を確認する。
+4. 対象作業記録、必要な[仕様](docs/specs/README.md)、採用済み[ADR](docs/adr/README.md)と関連コードだけを読む。UI変更では[デザイン方針](docs/design-guidelines.md)も読む。
+5. [資料一覧](docs/README.md#aiの工程別手順)の対応表から`.agents/skills/`の工程に合う手順を読む。すべての手順・過去ログを毎回読み込まない。
 
 ## 進行と判断
 

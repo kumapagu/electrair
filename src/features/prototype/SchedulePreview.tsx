@@ -17,6 +17,7 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const focusField = useRef<string | undefined>(undefined)
+  const saveInProgress = useRef(false)
   const [slot, setSlot] = useState<Slot>(item.slot ?? { date, start: '09:00', end: '11:00', worker: staff[0] })
   const [error, setError] = useState('')
   const [issues, setIssues] = useState<ReturnType<typeof assignmentErrors>>({})
@@ -63,7 +64,7 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (saving || submitted) return
+    if (saveInProgress.current || submitted) return
     setError('')
     setConflict('')
     const nextIssues = assignmentErrors(needsAddress ? address : item.address, slot)
@@ -74,6 +75,7 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
       return
     }
 
+    saveInProgress.current = true
     setSaving(true)
     try {
       await onSave(slot, needsAddress ? address : undefined)
@@ -86,12 +88,13 @@ export function ScheduleDialog({ item, date, onClose, onSave }: {
         setError(failure instanceof Error ? failure.message : '割当の保存に失敗しました。もう一度お試しください。')
       }
     } finally {
+      saveInProgress.current = false
       setSaving(false)
     }
   }
 
   return (
-    <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!saving) close() }} aria-labelledby="slot-title" className="preview-dialog">
+    <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!saveInProgress.current) close() }} aria-labelledby="slot-title" className="preview-dialog">
       <form noValidate onSubmit={submit}>
         <div className="dialog-heading">
           <div><p className="meta">{item.id} · {item.client}</p><h2 id="slot-title">{item.site}</h2></div>

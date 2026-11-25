@@ -9,6 +9,7 @@ export type Draft = { photos: Photo[]; completed: boolean; model: string; serial
 export const emptyDraft: Draft = { photos: [], completed: false, model: '', serial: '', memo: '' }
 export const reportGroups = ['未報告', '確認待ち', '確認済み'] as const
 export type ReportGroup = typeof reportGroups[number]
+export type Registration = Pick<Case, 'client' | 'site' | 'address' | 'note'>
 
 export type Case = {
   id: string
@@ -18,6 +19,7 @@ export type Case = {
   address: string
   note: string
   equipment: string
+  createdAt?: number
   slot?: Slot
   report?: { draft: Draft; submittedAt?: number; confirmedAt?: number }
 }

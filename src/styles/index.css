@@ -47,6 +47,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .preview-nav button svg { flex-shrink: 0; }
 .preview-nav button:hover, .preview-nav button[aria-current] { background: var(--soft-blue); color: var(--primary); }
 .preview-nav button:only-child { grid-column: 1 / -1; }
+@media (width < 960px) {
+  .preview-nav[data-view=admin] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .preview-nav[data-view=admin] button { flex-direction: column; gap: 3px; }
+}
 .workspace { min-width: 0; padding: 18px 14px 32px; }
 .workspace-inner { max-width: 1240px; margin: 0 auto; }
 .workspace-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 14px; }
@@ -81,6 +85,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .slot-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0 5px; }
 .schedule-note { margin-top: 13px; color: var(--muted); font-size: 12px; }
 .case-card h3 { font-size: 16px; font-weight: 800; margin: 4px 0; }
+.case-card, .slot-card, .site-panel, .preview-dialog { overflow-wrap: anywhere; }
 
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 750; }
 .badge-blue { background: var(--soft-blue); color: #18498d; }
